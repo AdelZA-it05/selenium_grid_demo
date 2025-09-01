@@ -37,6 +37,11 @@ jobs:
         run: |
           docker compose up -d selenoid selenoid-ui
 
+      - name: Pre-pull browser and recorder images
+        run: |
+          docker pull selenoid/chrome:121.0
+          docker pull selenoid/video-recorder:latest-release
+
       - name: Wait for Selenoid health
         run: |
           for i in {1..60}; do
