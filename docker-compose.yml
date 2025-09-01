@@ -31,6 +31,13 @@ services:
       - OVERRIDE_VIDEO_OUTPUT_DIR=/Users/sergeytsarev/selenium-selenoid-demo/selenoid/video
     networks:
       - grid
+    healthcheck:
+      # Проверяем, что Selenoid отвечает на /status (wget доступен в образе)
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4444/status >/dev/null || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 60
+      start_period: 5s
 
   selenoid-ui:
     # Веб‑интерфейс для наблюдения за сессиями, скачивания видео и просмотра логов
@@ -60,9 +67,11 @@ services:
       # Монтируем проект для запуска исходников без пересборки образа
       - ./:/app:rw
     working_dir: /app
-    entrypoint: ["/bin/sh", "-c"]
-    # Ждём готовности Selenoid, затем запускаем pytest
-    command: ["sh /app/scripts/wait-for-selenoid.sh && pytest -q"]
+    # Ждать готовности Selenoid через healthcheck
+    depends_on:
+      selenoid:
+        condition: service_healthy
+    # Используем CMD из Dockerfile.tests (pytest -q)
     networks:
       - grid
 
