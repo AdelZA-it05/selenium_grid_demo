@@ -48,7 +48,7 @@ jobs:
       # Предзагружаем образы браузера и видеозаписи, чтобы исключить таймауты
       - name: Pre-pull browser and recorder images
         run: |
-          docker pull selenoid/chrome:121.0
+          docker pull selenoid/chrome:128.0
           docker pull selenoid/video-recorder:latest-release
 
       # Дожидаемся готовности Selenoid на localhost:4444/status
