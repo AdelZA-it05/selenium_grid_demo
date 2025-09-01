@@ -1,4 +1,13 @@
 ## Стек Docker Compose для запуска Selenoid, Selenoid UI и тестов
+##
+## Как это работает:
+## - Selenoid (порт 4444) поднимает сессии, создавая под каждую тестовую сессию
+##   отдельный контейнер с браузером согласно конфигу browsers.json.
+## - Selenoid UI (порт 8080) показывает активные/прошедшие сессии, позволяет скачивать видео.
+## - tests — контейнер‑тест‑раннер, который подключается к Selenoid по внутреннему DNS.
+##
+## Важно: на Apple Silicon (arm64) образы Selenoid/браузеров чаще под amd64, поэтому
+## используется эмуляция (qemu). Это нормально, но может работать медленнее.
 services:
   selenoid:
     # Основной хаб Selenoid (динамически запускает контейнеры с браузерами)
@@ -27,13 +36,13 @@ services:
       - ./selenoid/video:/opt/selenoid/video
       - ./selenoid/logs:/opt/selenoid/logs
     environment:
-      # Важно для macOS: путь к видео должен быть расшарен в Docker Desktop
-      # Можно переопределить в CI: OVERRIDE_VIDEO_OUTPUT_DIR=$GITHUB_WORKSPACE/selenoid/video
+      # Важно для macOS: путь к видео должен быть расшарен в Docker Desktop (Settings → Resources → File sharing)
+      # Параметризуем в CI: OVERRIDE_VIDEO_OUTPUT_DIR=$GITHUB_WORKSPACE/selenoid/video
       - OVERRIDE_VIDEO_OUTPUT_DIR=${OVERRIDE_VIDEO_OUTPUT_DIR:-/Users/sergeytsarev/selenium-selenoid-demo/selenoid/video}
     networks:
       - grid
     healthcheck:
-      # Проверяем, что Selenoid отвечает на /status (wget доступен в образе)
+      # Проверяем, что хаб Selenoid отвечает на /status (wget есть в образе)
       test: ["CMD-SHELL", "wget -qO- http://localhost:4444/status >/dev/null || exit 1"]
       interval: 2s
       timeout: 1s
@@ -62,7 +71,7 @@ services:
     environment:
       # Подключение к Selenoid по DNS‑имени внутри сети compose
       - SELENOID_URL=http://selenoid:4444/wd/hub
-      # Имя используется для удобного имени видеофайла
+      # Имя используется для удобного имени видеофайла и отображается в UI
       - TEST_NAME=test_google
     volumes:
       # Монтируем проект для запуска исходников без пересборки образа
@@ -79,6 +88,9 @@ services:
 volumes: {}
 
 ## Общая пользовательская сеть для предсказуемого DNS и связи
+## Все сервисы находятся в одной сети, чтобы:
+## - tests мог резолвить имя selenoid
+## - selenoid создавал браузерные контейнеры в этой же сети (см. -container-network)
 networks:
   grid:
     name: selenoid_grid

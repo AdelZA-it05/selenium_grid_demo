@@ -1,6 +1,8 @@
+# CI‑пайплайн: прогон Selenium‑тестов через Selenoid в Docker Compose
 name: CI - Selenoid Selenium Tests
 
 on:
+  # Запускать pipeline при пушах и PR в основные ветки
   push:
     branches: [ main, master ]
   pull_request:
@@ -8,6 +10,7 @@ on:
 
 jobs:
   tests:
+    # GitHub‑runner с предустановленным Docker (Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,33 +18,40 @@ jobs:
       checks: write
 
     steps:
+      # Клонируем репозиторий
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Устанавливаем Python (для локальных скриптов и совместимости)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # Каталоги для видео и логов Selenoid, чтобы забрать артефакты
       - name: Prepare folders for artifacts
         run: |
           mkdir -p selenoid/video selenoid/logs
 
+      # Собираем образ тест‑раннера (Dockerfile.tests)
       - name: Build tests image
         run: |
           docker compose build tests
 
+      # Поднимаем Selenoid и UI; указываем путь для сохранения видео на runner
       - name: Start Selenoid and UI
         env:
           OVERRIDE_VIDEO_OUTPUT_DIR: ${{ github.workspace }}/selenoid/video
         run: |
           docker compose up -d selenoid selenoid-ui
 
+      # Предзагружаем образы браузера и видеозаписи, чтобы исключить таймауты
       - name: Pre-pull browser and recorder images
         run: |
           docker pull selenoid/chrome:121.0
           docker pull selenoid/video-recorder:latest-release
 
+      # Дожидаемся готовности Selenoid на localhost:4444/status
       - name: Wait for Selenoid health
         run: |
           for i in {1..60}; do
@@ -50,6 +60,7 @@ jobs:
           done
           echo "Selenoid not healthy"; docker ps -a; docker logs selenoid || true; exit 1
 
+      # Запускаем тесты в контейнере tests; URL указывает на сервис selenoid
       - name: Run tests
         env:
           SELENOID_URL: http://selenoid:4444/wd/hub
@@ -58,6 +69,7 @@ jobs:
         run: |
           docker compose run --rm tests
 
+      # Публикуем видео как артефакт job (можно скачать из Summary → Artifacts)
       - name: Upload videos
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,6 +78,7 @@ jobs:
           path: selenoid/video/*.mp4
           if-no-files-found: warn
 
+      # Публикуем логи драйверов как артефакт job (если включены)
       - name: Upload driver logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -74,12 +87,14 @@ jobs:
           path: selenoid/logs/**
           if-no-files-found: warn
 
+      # При неуспехе выводим логи Selenoid и UI в консоль
       - name: Dump Selenoid logs on failure
         if: failure()
         run: |
           docker logs selenoid || true
           docker logs selenoid-ui || true
 
+      # Очищаем ресурсы после завершения
       - name: Stop stack
         if: always()
         run: |

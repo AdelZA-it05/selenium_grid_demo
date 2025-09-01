@@ -1,20 +1,20 @@
-# Selenium + Selenoid (Docker Compose) demo
+# Демонстрация Selenium + Selenoid (Docker Compose)
 
-## Prerequisites
-- Docker and Docker Compose
+## Предварительные требования
+- Docker и Docker Compose
 - Python 3.10+
 
-## Start Selenoid stack
+## Запуск Selenoid локально
 ```bash
 cd /Users/sergeytsarev/selenium-selenoid-demo
 mkdir -p selenoid/video selenoid/logs
 docker compose up -d
 ```
 
-- Selenoid hub: `http://localhost:4444/wd/hub`
-- Selenoid UI: `http://localhost:8080`
+- Хаб Selenoid: `http://localhost:4444/wd/hub`
+- UI Selenoid: `http://localhost:8080`
 
-## Install deps and run tests locally
+## Установка зависимостей и запуск тестов локально
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -22,29 +22,32 @@ pip install -r requirements.txt
 pytest -q
 ```
 
-## Run tests via Docker Compose
+## Запуск тестов через Docker Compose
 ```bash
 docker compose up -d selenoid selenoid-ui
 docker compose run --rm tests
 ```
 
-The tests container waits until Selenoid is ready. Videos are named after `TEST_NAME` and stored in `selenoid/video`.
+Контейнер с тестами ждёт готовности Selenoid (healthcheck). Видео называются по `TEST_NAME` и сохраняются в `selenoid/video`.
 
-The test uses `SELENOID_URL` env var if set (defaults to `http://localhost:4444/wd/hub`).
+Тест использует переменную `SELENOID_URL`, если она задана (по умолчанию `http://localhost:4444/wd/hub`).
 
-## Videos and logs
-- Videos are saved to `selenoid/video`
-- Driver logs are saved to `selenoid/logs`
+## Видео и логи
+- Видео: `selenoid/video`
+- Логи драйверов: `selenoid/logs`
 
-You can also download recordings from Selenoid UI after the session completes.
+Также записи можно скачать через Selenoid UI после завершения сессии.
 
 ## Что делает каждый файл
-- docker-compose.yml: поднимает Selenoid hub (порт 4444), Selenoid UI (порт 8080) и контейнер с тестами. Использует отдельную сеть `selenoid_grid`, чтобы браузерные контейнеры были доступны, а тесты могли резолвить хостнейм `selenoid`. На macOS каталог видео смонтирован в путь, расшаренный в Docker Desktop.
+- docker-compose.yml: поднимает Selenoid hub (порт 4444), Selenoid UI (порт 8080) и контейнер с тестами. Использует отдельную сеть `selenoid_grid`, чтобы браузерные контейнеры были доступны, а тесты могли резолвить хостнейм `selenoid`. На macOS путь к видео параметризован `OVERRIDE_VIDEO_OUTPUT_DIR`.
 - selenoid/browsers.json: реестр доступных браузеров. Здесь используется `selenoid/chrome:121.0` (без VNC) с WebDriver на порту 4444. При необходимости корректируйте `default` и список версий.
-- scripts/wait-for-selenoid.sh: простой скрипт ожидания готовности, который пингует `http://selenoid:4444/status` перед запуском pytest.
-- Dockerfile.tests: лёгкий Python‑образ с pytest + selenium и curl для скрипта ожидания. Папка проекта монтируется при запуске, чтобы можно было менять код без пересборки.
-- tests/test_google.py: пример Selenium‑теста, подключается к Selenoid как к удалённому WebDriver, задаёт имя видео через `selenoid:options`, закрывает окно согласия Google и проверяет заголовок.
+- Dockerfile.tests: лёгкий Python‑образ с pytest + selenium (и curl), исходники монтируются при запуске.
+- tests/test_google.py: пример Selenium‑теста, подключается к Selenoid как к удалённому WebDriver, включает VNC/видео через `selenoid:options`, закрывает окно согласия Google и проверяет заголовок.
 
-## Common issues
-- If Chrome version changes, update `selenoid/browsers.json` and the `browserVersion` in test caps.
-- On Apple Silicon, Docker may need additional resources (Settings → Resources).
+## Частые вопросы
+- Если меняется версия Chrome, обновите `selenoid/browsers.json` и `browserVersion` в тесте.
+- На Apple Silicon можно увеличить ресурсы Docker Desktop (Settings → Resources).
+
+## GitHub Actions
+- Workflow `.github/workflows/ci.yml` поднимает Selenoid, затем выполняет `docker compose run --rm tests`.
+- Видео и логи загружаются как артефакты job.
