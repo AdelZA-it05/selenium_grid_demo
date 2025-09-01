@@ -28,7 +28,8 @@ services:
       - ./selenoid/logs:/opt/selenoid/logs
     environment:
       # Важно для macOS: путь к видео должен быть расшарен в Docker Desktop
-      - OVERRIDE_VIDEO_OUTPUT_DIR=/Users/sergeytsarev/selenium-selenoid-demo/selenoid/video
+      # Можно переопределить в CI: OVERRIDE_VIDEO_OUTPUT_DIR=$GITHUB_WORKSPACE/selenoid/video
+      - OVERRIDE_VIDEO_OUTPUT_DIR=${OVERRIDE_VIDEO_OUTPUT_DIR:-/Users/sergeytsarev/selenium-selenoid-demo/selenoid/video}
     networks:
       - grid
     healthcheck:

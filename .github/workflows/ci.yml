@@ -1,0 +1,83 @@
+name: CI - Selenoid Selenium Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare folders for artifacts
+        run: |
+          mkdir -p selenoid/video selenoid/logs
+
+      - name: Build tests image
+        run: |
+          docker compose build tests
+
+      - name: Start Selenoid and UI
+        env:
+          OVERRIDE_VIDEO_OUTPUT_DIR: ${{ github.workspace }}/selenoid/video
+        run: |
+          docker compose up -d selenoid selenoid-ui
+
+      - name: Wait for Selenoid health
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:4444/status >/dev/null; then echo OK; exit 0; fi
+            sleep 1
+          done
+          echo "Selenoid not healthy"; docker ps -a; docker logs selenoid || true; exit 1
+
+      - name: Run tests
+        env:
+          SELENOID_URL: http://selenoid:4444/wd/hub
+          TEST_NAME: gha_test
+          OVERRIDE_VIDEO_OUTPUT_DIR: ${{ github.workspace }}/selenoid/video
+        run: |
+          docker compose run --rm tests
+
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenoid-videos
+          path: selenoid/video/*.mp4
+          if-no-files-found: warn
+
+      - name: Upload driver logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenoid-logs
+          path: selenoid/logs/**
+          if-no-files-found: warn
+
+      - name: Dump Selenoid logs on failure
+        if: failure()
+        run: |
+          docker logs selenoid || true
+          docker logs selenoid-ui || true
+
+      - name: Stop stack
+        if: always()
+        run: |
+          docker compose down -v
+
+
